@@ -9,7 +9,7 @@ interface OrderModalProps {
     startMode?: 'menu' | 'delivery_direct'; // New prop to control entry point
 }
 
-type OrderStep = 'menu_selection' | 'selection' | 'delivery' | 'reservation' | 'success' | 'delivery_platforms';
+type OrderStep = 'menu_selection' | 'cart' | 'selection' | 'delivery' | 'reservation' | 'success' | 'delivery_platforms';
 
 interface CartItem {
     itemId: number;
@@ -154,7 +154,12 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, startMode = 'm
     };
 
     const handleBack = () => {
-        if (step === 'selection') setStep('menu_selection');
+        if (step === 'cart') setStep('menu_selection');
+        if (step === 'selection') {
+            // On mobile, back from selection goes to cart
+            if (window.innerWidth < 768) setStep('cart');
+            else setStep('menu_selection');
+        }
         if (step === 'delivery') setStep('selection');
         if (step === 'reservation') setStep('selection');
     };
@@ -238,7 +243,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, startMode = 'm
             {/* Close Button */}
             <button
                 onClick={resetAndClose}
-                className="absolute top-4 right-4 md:top-6 md:right-6 text-white hover:text-mazzo-red transition-colors z-[110]"
+                className="absolute top-4 right-4 md:top-6 md:right-6 text-gray-900 hover:text-mazzo-red transition-colors z-[110]"
             >
                 <X size={32} />
             </button>
@@ -260,9 +265,10 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, startMode = 'm
                                 )}
                                 <h2 className="text-xl md:text-2xl font-serif text-mazzo-green">
                                     {step === 'menu_selection' ? 'Composez votre menu' :
-                                        step === 'selection' ? 'Mode de retrait' :
-                                            step === 'delivery' ? 'Adresse de livraison' :
-                                                step === 'reservation' ? 'Détails réservation' : ''}
+                                        step === 'cart' ? 'Vérifiez votre panier' :
+                                            step === 'selection' ? 'Mode de retrait' :
+                                                step === 'delivery' ? 'Adresse de livraison' :
+                                                    step === 'reservation' ? 'Détails réservation' : ''}
                                 </h2>
                             </div>
                         </div>
@@ -335,8 +341,8 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, startMode = 'm
                                             key={cat}
                                             onClick={() => setActiveCategory(cat)}
                                             className={`px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors ${activeCategory === cat
-                                                    ? 'bg-mazzo-green text-white'
-                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                ? 'bg-mazzo-green text-white'
+                                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                                 }`}
                                         >
                                             {cat}
@@ -394,6 +400,91 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, startMode = 'm
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* STEP: MOBILE CART VIEW */}
+                    {step === 'cart' && (
+                        <div className="flex-1 flex flex-col overflow-hidden bg-white animate-in slide-in-from-right duration-300">
+                            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+                                {cart.length === 0 ? (
+                                    <div className="text-center text-gray-400 mt-10">
+                                        <ShoppingBag size={48} className="mx-auto mb-4 opacity-20" />
+                                        <p>Votre panier est vide</p>
+                                    </div>
+                                ) : (
+                                    cart.map((item, index) => (
+                                        <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+                                            <div className="p-3 flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <p className="font-bold text-gray-800 text-sm">{item.name}</p>
+                                                    {item.sizeLabel && <span className="text-[10px] text-gray-400 bg-gray-100 px-1 rounded mr-2">{item.sizeLabel}</span>}
+                                                    {item.supplements.length > 0 && (
+                                                        <div className="text-[10px] text-mazzo-red mt-1">
+                                                            + {item.supplements.join(', ')}
+                                                        </div>
+                                                    )}
+                                                    <div className="mt-2 text-mazzo-green font-bold text-sm">{getItemTotal(item).toFixed(2)} €</div>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex items-center border border-gray-200 rounded-md">
+                                                            <button onClick={() => updateQuantity(index, -1)} className="p-1 hover:bg-gray-100 text-gray-500"><Minus size={12} /></button>
+                                                            <span className="text-xs font-bold w-6 text-center">{item.quantity}</span>
+                                                            <button onClick={() => updateQuantity(index, 1)} className="p-1 hover:bg-gray-100 text-gray-500"><Plus size={12} /></button>
+                                                        </div>
+                                                        <button onClick={() => removeFromCart(index)} className="text-red-400 hover:text-red-600">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="border-t border-gray-100">
+                                                <button
+                                                    onClick={() => setExpandedCartItem(expandedCartItem === index ? null : index)}
+                                                    className="w-full flex items-center justify-between p-2 text-xs text-gray-500 hover:bg-gray-50 transition-colors"
+                                                >
+                                                    <span>Ajouter un supplément</span>
+                                                    {expandedCartItem === index ? <ChevronUp size={14} /> : <Plus size={14} />}
+                                                </button>
+                                                {expandedCartItem === index && (
+                                                    <div className="bg-gray-50 p-3 space-y-2">
+                                                        {SUPPLEMENTS_LIST.map((sup) => (
+                                                            <label key={sup.name} className="flex items-center justify-between cursor-pointer group">
+                                                                <div className="flex items-center">
+                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${item.supplements.includes(sup.name) ? 'bg-mazzo-green border-mazzo-green' : 'border-gray-300 bg-white'}`}>
+                                                                        {item.supplements.includes(sup.name) && <CheckCircle size={10} className="text-white" />}
+                                                                    </div>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="hidden"
+                                                                        checked={item.supplements.includes(sup.name)}
+                                                                        onChange={() => toggleSupplement(index, sup.name)}
+                                                                    />
+                                                                    <span className="text-xs ml-2 text-gray-700">{sup.name}</span>
+                                                                </div>
+                                                                <span className="text-xs font-bold text-gray-500">+{sup.price.toFixed(2)}€</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div className="p-4 bg-white border-t border-gray-100 shrink-0">
+                                <div className="flex justify-between items-center mb-4 text-lg font-bold text-gray-900">
+                                    <span>Total</span>
+                                    <span>{cartTotal.toFixed(2)} €</span>
+                                </div>
+                                <button
+                                    onClick={() => setStep('selection')}
+                                    className="w-full bg-mazzo-red text-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg"
+                                >
+                                    Valider et choisir livraison
+                                </button>
                             </div>
                         </div>
                     )}
@@ -692,7 +783,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, startMode = 'm
                         </div>
                         <button
                             disabled={cart.length === 0}
-                            onClick={() => setStep('selection')}
+                            onClick={() => setStep('cart')}
                             className="bg-mazzo-red disabled:bg-gray-300 text-white px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest"
                         >
                             Voir panier
